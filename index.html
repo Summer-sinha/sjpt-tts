@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f2f6f3">
+<title>SJPT 일본어 낭독 연습</title>
+<style>
+:root{color-scheme:light;--ink:#192c2b;--muted:#526963;--accent:#185c4b;--line:#c9d9d2;--wash:#e8f2ed}
+*{box-sizing:border-box}
+body{margin:0;background:#f2f6f3;color:var(--ink);font:16px/1.55 system-ui,"Malgun Gothic",sans-serif}
+main{width:calc(100% - 32px);max-width:920px;margin:36px auto}
+h1{font-size:clamp(1.6rem,4vw,2.4rem);margin:0 0 4px;letter-spacing:-.05em}
+h2{font-size:1rem;margin:0}
+p{margin:0;color:var(--muted)}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;margin-top:16px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.between{justify-content:space-between}
+.controls{margin-top:12px}
+.controls label{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer}
+.controls input{width:19px;height:19px;margin:0;accent-color:var(--accent)}
+button,select,input,textarea{font:inherit}
+button,select,input[type=number],textarea{border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+button{min-height:44px;padding:8px 13px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:white;font-weight:700}
+button:disabled{opacity:.52;cursor:default}
+:focus-visible{outline:3px solid #389781;outline-offset:2px}
+textarea{width:100%;min-height:190px;resize:vertical;margin-top:10px;padding:12px}
+textarea,.sentence{font-family:"Yu Gothic","Hiragino Sans","Noto Sans JP",sans-serif}
+summary{cursor:pointer;font-weight:650}
+.settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.voice{grid-column:1/-1}
+select{display:block;width:100%;max-width:100%;min-height:44px;padding:6px 8px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=number]{width:5em;min-height:40px;padding:5px 8px}
+small,.muted{color:var(--muted);font-size:.875rem}
+progress{display:block;width:100%;height:9px;accent-color:var(--accent);margin:10px 0}
+#sentences{max-height:300px;overflow:auto;overscroll-behavior:contain;margin-top:10px}
+.sentence{display:block;text-align:left;width:100%;white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0}
+.sentence[aria-current=true]{background:var(--wash);border-color:var(--accent);box-shadow:inset 3px 0 var(--accent)}
+.paragraph{margin-top:16px}
+footer{margin:16px 4px;color:var(--muted);font-size:.875rem}
+@media(max-width:600px){
+  main{width:calc(100% - 24px);margin:20px auto}
+  .card{padding:14px}
+  .settings{gap:12px}
+  textarea{min-height:150px}
+  .controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .controls .primary,.controls label{grid-column:1/-1}
+  .controls button{min-height:48px}
+  #sentences{max-height:min(300px,45vh)}
+}
+@media(max-width:360px){
+  #script-label{display:block}
+  .script-header{align-items:flex-start;flex-direction:column}
+}
+</style>
+</head>
+<body>
+<main>
+<header><h1>SJPT 일본어 낭독 연습</h1><p>스크립트를 붙여넣고 재생을 누르세요.</p></header>
+<section class="card" aria-labelledby="script-label">
+<div class="row between script-header">
+<h2><label id="script-label" for="script">일본어 스크립트</label></h2>
+<div class="row"><button id="copy">전체 복사</button><button id="clear">전체 삭제</button></div>
+</div>
+<textarea id="script" lang="ja" spellcheck="false" placeholder="ここに日本語の文章を貼り付けてください。"></textarea>
+<div class="row between"><small id="saved" role="status"></small><small id="count"></small></div>
+<div class="row controls">
+<button class="primary" id="play">▶ 재생</button>
+<button id="pause">일시정지</button><button id="stop">정지</button>
+<button id="prev">이전 문장</button><button id="next">다음 문장</button>
+<label><input type="checkbox" id="repeat"> 전체 반복</label>
+</div>
+</section>
+<details class="card" open>
+<summary>음성 및 속도 설정</summary>
+<div class="settings">
+<label class="voice">일본어 음성<select id="voice"></select></label>
+<label class="voice">낭독 속도 <output id="rateLabel" for="rate"></output><input id="rate" type="range" min="0.6" max="1" step="0.05" value="0.9"></label>
+<label>문장 간격<br><input id="sentenceGap" type="number" min="0" max="60" step="0.5" value="3"> 초</label>
+<label>문단 간격<br><input id="paragraphGap" type="number" min="0" max="60" step="0.5" value="7"> 초</label>
+</div>
+</details>
+<section class="card" aria-labelledby="reading">
+<div class="row between"><h2 id="reading">문장별 듣기</h2><span id="position" class="muted"></span></div>
+<progress id="progress" aria-label="재생 진행률" max="1" value="0"></progress>
+<p id="status" role="status"></p>
+<div id="sentences" aria-label="일본어 문장 목록"></div>
+</section>
+<footer>문장 목록에서 원하는 문장 하나를 재생할 수 있습니다. 빈 줄은 문단을 구분합니다. 음색과 발음은 선택한 음성에 따라 달라집니다. 화면 잠금이나 백그라운드 전환 시 재생이 지연되거나 중단될 수 있습니다.</footer>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const script = $("script");
+const synth = window.speechSynthesis;
+const supported = Boolean(synth && window.SpeechSynthesisUtterance);
+const key = "sjpt-tts-v1";
+const useNativePause = !/Android/i.test(navigator.userAgent);
+let stored = {};
+try { stored = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
+script.value = stored.script ?? "";
+for (const name of ["rate", "sentenceGap", "paragraphGap"]) {
+  if (stored[name] !== undefined) $(name).value = stored[name];
+}
+$("repeat").checked = stored.repeat === true;
+let voiceURI = stored.voice ?? "";
+let voices = [];
+let sentences = [];
+let index = 0;
+let completed = 0;
+let part = 0;
+let chunks = [];
+let state = "idle";
+let single = false;
+let generation = 0;
+let timer;
+let watchdog;
+let deadline = 0;
+let remaining = 0;
+let nextIndex = 0;
+let utterance;
+let rate = 0.9;
+let selectedVoice;
+let highlighted;
+let message = "";
+
+function gapValue(name, fallback) {
+  const value = $(name).valueAsNumber;
+  return Number.isFinite(value) ? Math.min(60, Math.max(0, value)) : fallback;
+}
+
+function save(feedback = "") {
+  let saved = true;
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      script: script.value, rate: Number($("rate").value),
+      sentenceGap: gapValue("sentenceGap", 3), paragraphGap: gapValue("paragraphGap", 7),
+      voice: voiceURI, repeat: $("repeat").checked
+    }));
+  } catch { saved = false; }
+  $("saved").textContent = feedback || (saved ? "이 브라우저에 자동 저장" : "이 브라우저에서는 자동 저장을 사용할 수 없습니다.");
+}
+
+function loadVoices() {
+  voices = supported ? synth.getVoices().filter(voice => /^ja(?:[-_]|$)/i.test(voice.lang)) : [];
+  const likelyFemale = /female|女性|Kyoko|Misaki|Haruka|Nanami|Sayaka|Ayumi|Aoi|Shiori|Hikari|Sakura/i;
+  const automatic = voices.find(voice => /female|女性/i.test(voice.name) && !/\bmale\b/i.test(voice.name))
+    || voices.find(voice => likelyFemale.test(voice.name))
+    || voices.find(voice => voice.default) || voices[0];
+  const select = $("voice");
+  select.replaceChildren(new Option(automatic ? "자동 · " + automatic.name : "자동 · 브라우저 일본어 기본 음성 (ja-JP)", ""));
+  for (const voice of voices) select.add(new Option(voice.name + " · " + voice.lang, voice.voiceURI));
+  select.value = voices.some(voice => voice.voiceURI === voiceURI) ? voiceURI : "";
+  return voices.find(voice => voice.voiceURI === select.value) ?? automatic;
+}
+
+function splitSentences(text) {
+  const result = [];
+  let paragraph = false;
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) {
+      paragraph = result.length > 0;
+      continue;
+    }
+    // Keep punctuation and closing quotes with the sentence they follow.
+    const pieces = line.match(/[^。！？!?]*[。！？!?]+[」』）】〉》〕”’"']*|[^。！？!?]+$/gu) ?? [];
+    for (const piece of pieces) {
+      if (!piece.trim()) continue;
+      result.push({ text: piece, paragraph });
+      paragraph = false;
+    }
+  }
+  return result;
+}
+
+function splitLongSentence(text) {
+  const characters = Array.from(text);
+  const result = [];
+  let start = 0;
+  while (characters.length - start > 90) {
+    let end = start + 90;
+    // Prefer a natural break when a voice engine needs a shorter utterance.
+    for (let cursor = end - 1; cursor >= start + 40; cursor--) {
+      if (/[、，,；;\s]/u.test(characters[cursor])) {
+        end = cursor + 1;
+        break;
+      }
+    }
+    result.push(characters.slice(start, end).join(""));
+    start = end;
+  }
+  if (start < characters.length) result.push(characters.slice(start).join(""));
+  return result;
+}
+
+function render() {
+  const active = state !== "idle";
+  $("play").disabled = !supported || !sentences.length || active;
+  $("stop").disabled = !active;
+  $("pause").disabled = !active;
+  $("pause").textContent = state.startsWith("paused") ? "이어 듣기" : "일시정지";
+  $("prev").disabled = !sentences.length || index === 0;
+  $("next").disabled = !sentences.length || index >= sentences.length - 1;
+  $("position").textContent = sentences.length ? (index + 1) + " / " + sentences.length + " 문장" : "0 문장";
+  $("progress").max = sentences.length || 1;
+  $("progress").value = completed;
+  $("status").textContent = message || (!supported ? "이 브라우저는 음성 합성을 지원하지 않습니다." : "재생하거나 문장을 선택하세요.");
+  highlighted?.removeAttribute("aria-current");
+  highlighted = $("sentences").children[index];
+  if (highlighted) {
+    highlighted.setAttribute("aria-current", "true");
+    if (active) {
+      const list = $("sentences");
+      const top = highlighted.getBoundingClientRect().top - list.getBoundingClientRect().top;
+      if (top < 0 || top + highlighted.offsetHeight > list.clientHeight) list.scrollTop += top;
+    }
+  }
+}
+
+function cancelPlayback() {
+  generation++;
+  clearTimeout(timer);
+  clearTimeout(watchdog);
+  const wasActive = Boolean(utterance);
+  utterance = undefined;
+  state = "idle";
+  if (supported && wasActive) {
+    synth.cancel();
+    if (synth.paused) synth.resume();
+  }
+}
+
+function rebuild() {
+  cancelPlayback();
+  index = 0;
+  completed = 0;
+  message = "";
+  sentences = splitSentences(script.value);
+  const fragment = document.createDocumentFragment();
+  sentences.forEach((sentence, i) => {
+    const button = document.createElement("button");
+    button.className = "sentence" + (sentence.paragraph ? " paragraph" : "");
+    button.lang = "ja";
+    button.textContent = sentence.text;
+    button.disabled = !supported;
+    button.setAttribute("aria-label", (i + 1) + ". " + sentence.text);
+    button.addEventListener("click", () => start(i, true));
+    fragment.append(button);
+  });
+  $("sentences").replaceChildren(fragment);
+  $("count").textContent = script.value.length.toLocaleString("ko-KR") + "자";
+  save();
+  render();
+}
+
+function fail(reason) {
+  cancelPlayback();
+  message = "음성을 재생하지 못했습니다 (" + reason + "). 일본어 음성을 바꾸거나 다른 브라우저에서 다시 재생해 보세요.";
+  render();
+}
+
+function speakPart() {
+  const token = generation;
+  state = "starting";
+  message = "음성 준비 중";
+  const speech = new SpeechSynthesisUtterance(chunks[part]);
+  utterance = speech;
+  speech.lang = selectedVoice?.lang ?? "ja-JP";
+  if (selectedVoice) speech.voice = selectedVoice;
+  speech.rate = rate;
+  const isCurrent = () => token === generation && utterance === speech;
+  speech.onstart = () => {
+    if (!isCurrent()) return;
+    state = "speaking";
+    message = "낭독 중";
+    render();
+  };
+  function recoverInterruptedPause() {
+    if (state !== "pausedNative") return false;
+    cancelPlayback();
+    state = "pausedSpeech";
+    message = "일시정지 · 이어 듣기를 누르면 현재 낭독 구간부터 다시 읽습니다.";
+    render();
+    return true;
+  }
+  speech.onend = () => {
+    if (!isCurrent() || recoverInterruptedPause()) return;
+    clearTimeout(watchdog);
+    utterance = undefined;
+    part++;
+    if (part < chunks.length) speakPart();
+    else finishSentence();
+  };
+  speech.onerror = event => {
+    if (isCurrent() && !recoverInterruptedPause()) fail(event.error || "음성 오류");
+  };
+  watchdog = setTimeout(() => { if (isCurrent()) fail("음성 엔진 응답 지연"); }, 90000);
+  render();
+  try { synth.speak(speech); } catch { fail("음성 오류"); }
+}
+
+function speakSentence() {
+  part = 0;
+  chunks = splitLongSentence(sentences[index].text);
+  speakPart();
+}
+
+function waitForNext(ms) {
+  const token = generation;
+  state = "gap";
+  deadline = performance.now() + ms;
+  message = "다음 문장까지 " + (ms / 1000).toLocaleString("ko-KR", {maximumFractionDigits: 1}) + "초 대기";
+  render();
+  const advance = () => {
+    if (token !== generation || state !== "gap") return;
+    index = nextIndex;
+    if (index === 0) completed = 0;
+    speakSentence();
+  };
+  if (ms === 0) advance();
+  else timer = setTimeout(advance, ms);
+}
+
+function finishSentence() {
+  completed = index + 1;
+  const last = completed === sentences.length;
+  if (single || (last && !$("repeat").checked)) {
+    state = "idle";
+    message = single ? "선택한 문장 재생 완료" : "전체 낭독 완료";
+    render();
+    return;
+  }
+  nextIndex = last ? 0 : index + 1;
+  const paragraph = last || sentences[nextIndex].paragraph;
+  waitForNext(1000 * (paragraph ? gapValue("paragraphGap", 7) : gapValue("sentenceGap", 3)));
+}
+
+function start(from, one = false) {
+  if (!supported || !sentences[from]) return;
+  cancelPlayback();
+  index = from;
+  completed = from;
+  single = one;
+  rate = Number($("rate").value);
+  selectedVoice = loadVoices();
+  speakSentence();
+}
+
+function pauseOrResume() {
+  if (state === "gap") {
+    remaining = Math.max(0, deadline - performance.now());
+    clearTimeout(timer);
+    state = "pausedGap";
+  } else if (state === "pausedGap") {
+    waitForNext(remaining);
+    return;
+  } else if (state === "pausedSpeech") {
+    speakPart();
+    return;
+  } else if (state === "pausedNative") {
+    state = "speaking";
+    message = "낭독 중";
+    watchdog = setTimeout(() => fail("음성 엔진 응답 지연"), 90000);
+    synth.resume();
+  } else if (state === "speaking" && useNativePause) {
+    clearTimeout(watchdog);
+    state = "pausedNative";
+    message = "일시정지";
+    synth.pause();
+  } else {
+    // Some mobile engines treat native pause as cancel. Resume the same audio segment.
+    cancelPlayback();
+    state = "pausedSpeech";
+  }
+  if (state === "pausedSpeech") message = "일시정지 · 이어 듣기를 누르면 현재 낭독 구간부터 다시 읽습니다.";
+  if (state === "pausedGap") message = "문장 간격 일시정지";
+  render();
+}
+
+function move(delta) {
+  const target = index + delta;
+  if (!sentences[target]) return;
+  if (state !== "idle") start(target, single);
+  else {
+    index = target;
+    completed = target;
+    message = "문장 선택됨 · 재생을 누르세요.";
+    render();
+  }
+}
+
+$("play").onclick = () => start(completed === sentences.length ? 0 : index);
+$("pause").onclick = pauseOrResume;
+$("stop").onclick = () => {
+  cancelPlayback();
+  index = 0;
+  completed = 0;
+  message = "정지 · 재생을 누르면 처음부터 읽습니다.";
+  render();
+};
+$("prev").onclick = () => move(-1);
+$("next").onclick = () => move(1);
+$("clear").onclick = () => {
+  script.value = "";
+  rebuild();
+  script.focus();
+};
+$("copy").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(script.value);
+    save("전체 스크립트를 복사했습니다.");
+  } catch {
+    script.focus();
+    script.select();
+    let copied = false;
+    try { copied = document.execCommand("copy"); } catch {}
+    save(copied ? "전체 스크립트를 복사했습니다." : "전체 선택했습니다. 기기의 복사 기능을 사용하세요.");
+  }
+};
+script.addEventListener("input", rebuild);
+$("voice").addEventListener("change", () => { voiceURI = $("voice").value; save(); });
+$("repeat").addEventListener("change", () => save());
+for (const [name, fallback] of [["sentenceGap", 3], ["paragraphGap", 7]]) {
+  $(name).addEventListener("change", () => { $(name).value = gapValue(name, fallback); save(); });
+}
+function showRate() { $("rateLabel").value = Number($("rate").value).toFixed(2) + "배"; }
+$("rate").addEventListener("input", () => { showRate(); save(); });
+if (supported) synth.addEventListener("voiceschanged", loadVoices);
+window.addEventListener("pagehide", () => { cancelPlayback(); render(); });
+loadVoices();
+showRate();
+rebuild();
+</script>
+</body>
+</html>
